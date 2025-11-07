@@ -1,35 +1,38 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { PromptForm } from './components/PromptForm';
 import { LoadingIndicator } from './components/LoadingIndicator';
 import { VideoPlayer } from './components/VideoPlayer';
 import { HistoryList } from './components/HistoryList';
-import { ApiKeySelector } from './components/ApiKeySelector';
 import { generateVideo } from './services/geminiService';
-import type { HistoryItem, VoiceOption, FormState } from './types';
+import type { HistoryItem, FormState } from './types';
 import { MALE_VOICES, FEMALE_VOICES, LOADING_MESSAGES } from './constants';
 import { AuthModal } from './components/AuthModal';
-
-// FIX: Define and use a named AIStudio interface to resolve conflicting global type declarations for window.aistudio.
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-  interface Window {
-    aistudio: AIStudio;
-  }
-}
+import { ApiKeySelector } from './components/ApiKeySelector';
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
-  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<React.ReactNode | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
+
+  useEffect(() => {
+    const checkApiKey = async () => {
+      if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+        const keySelected = await window.aistudio.hasSelectedApiKey();
+        setHasApiKey(keySelected);
+      } else {
+        // Fallback for environments where aistudio is not available
+        console.warn('window.aistudio not found. Assuming API key is set.');
+        setHasApiKey(true);
+      }
+    };
+    checkApiKey();
+  }, []);
 
   useEffect(() => {
     if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -46,18 +49,6 @@ const App: React.FC = () => {
       console.error("Failed to parse history from localStorage", e);
       setHistory([]);
     }
-
-    const checkApiKey = async () => {
-      if (window.aistudio) {
-        const keyStatus = await window.aistudio.hasSelectedApiKey();
-        setHasApiKey(keyStatus);
-      } else {
-        // Fallback for local development or if aistudio is not available
-        console.warn("aistudio not found, assuming API key is set via environment variable.");
-        setHasApiKey(true);
-      }
-    };
-    checkApiKey();
   }, []);
 
   const handleThemeToggle = () => {
@@ -65,10 +56,6 @@ const App: React.FC = () => {
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
-  };
-
-  const handleKeySelected = () => {
-    setHasApiKey(true);
   };
 
   const handleGeneration = async (formState: FormState) => {
@@ -85,11 +72,16 @@ const App: React.FC = () => {
       
       const apiKey = process.env.API_KEY;
       if (!apiKey) {
-        throw new Error("API_KEY environment variable not found.");
+        throw new Error("API_KEY environment variable not found. Please select an API Key.");
       }
       
       const response = await fetch(`${videoUri}&key=${apiKey}`);
       if (!response.ok) {
+        const errorBody = await response.text();
+        console.error("Fetch video error:", errorBody);
+        if (errorBody.includes('API key not valid') || errorBody.includes('Requested entity was not found')) {
+            throw new Error('The selected API Key is not valid. Please select another key.');
+        }
         throw new Error(`Failed to fetch video: ${response.statusText}`);
       }
       
@@ -112,24 +104,59 @@ const App: React.FC = () => {
 
     } catch (err: any) {
       console.error(err);
-      let errorMessage = err.message || 'An unknown error occurred.';
-      if (err.message && err.message.includes('Requested entity was not found')) {
-        errorMessage = 'API Key not found or invalid. Please select a valid key.';
-        setHasApiKey(false); // Reset to force re-selection
+      
+      let message = 'Ocorreu um erro desconhecido.';
+
+      if (typeof err === 'string') {
+        message = err;
+      } else if (err && typeof err === 'object') {
+        if (err.error?.message) { // Direct Gemini error object
+            message = err.error.message;
+        } else if (err.message) { // Standard Error object
+            message = err.message;
+        }
       }
-      setError(errorMessage);
+
+      // The message itself could be a JSON string
+      try {
+        const parsedError = JSON.parse(message);
+        if (parsedError.error?.message) {
+          message = parsedError.error.message;
+        }
+      } catch (e) {
+        // Not a JSON string, continue with the current message.
+      }
+
+      if (message.includes('Requested entity was not found') || message.includes('API key not valid')) {
+        setError('A Chave de API é inválida ou não tem permissões. Por favor, selecione uma Chave de API válida para continuar.');
+        setHasApiKey(false); // Force user to re-select the key
+      } else if (message.includes('exceeded your current quota') || message.includes('RESOURCE_EXHAUSTED')) {
+        setError(
+          <>
+            Você excedeu sua cota de uso. Verifique seu plano e faturamento e tente novamente mais tarde. Saiba mais na{' '}
+            <a 
+              href="https://ai.google.dev/gemini-api/docs/rate-limits" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="underline font-semibold hover:text-red-800"
+            >
+              documentação de limites de uso
+            </a>.
+          </>
+        );
+      } else {
+        setError(message);
+      }
     } finally {
       setIsLoading(false);
     }
   };
   
   const renderContent = () => {
-    if (hasApiKey === null) {
-      return <div className="flex justify-center items-center h-screen text-gray-700 dark:text-gray-300">Checking API Key...</div>;
-    }
     if (!hasApiKey) {
-      return <ApiKeySelector onKeySelected={handleKeySelected} />;
+      return <ApiKeySelector onKeySelected={() => setHasApiKey(true)} />;
     }
+
     return (
       <>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 p-4 sm:p-6 lg:p-8">
@@ -138,7 +165,7 @@ const App: React.FC = () => {
           </div>
           <div className="lg:col-span-2">
             {isLoading && <LoadingIndicator messages={LOADING_MESSAGES} />}
-            {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative" role="alert"><strong className="font-bold">Error: </strong><span className="block sm:inline">{error}</span></div>}
+            {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative" role="alert"><strong className="font-bold">Erro: </strong><span className="block sm:inline">{error}</span></div>}
             {generatedVideoUrl && !isLoading && <VideoPlayer src={generatedVideoUrl} />}
           </div>
         </div>
