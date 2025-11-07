@@ -1,0 +1,74 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PromoVídeo IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'electric-blue': {
+                '50': '#f0f8ff',
+                '100': '#e0f1ff',
+                '200': '#c2e5ff',
+                '300': '#94d5ff',
+                '400': '#61bfff',
+                '500': '#3b9eff',
+                '600': '#1b7aff',
+                '700': '#0f61ff',
+                '800': '#154ed8',
+                '900': '#1744ad',
+                '950': '#112a6c',
+              },
+              'neon-purple': {
+                '50': '#f8f3ff',
+                '100': '#efebff',
+                '200': '#e0d6ff',
+                '300': '#cab8ff',
+                '400': '#ae8eff',
+                '500': '#9160ff',
+                '600': '#7f2dff',
+                '700': '#7214ff',
+                '800': '#5e0bd8',
+                '900': '#4e0caa',
+                '950': '#2e0078',
+              },
+              'warm-yellow': {
+                '50': '#fffbeb',
+                '100': '#fff1c7',
+                '200': '#ffe389',
+                '300': '#ffd04d',
+                '400': '#ffbe20',
+                '500': '#fca60b',
+                '600': '#e18300',
+                '700': '#bb6202',
+                '800': '#984f08',
+                '900': '#7c410c',
+                '950': '#482200',
+              },
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+</head>
+  <body class="bg-gray-100 dark:bg-gray-900">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,5 @@
+{
+  "name": "PromoVídeo IA",
+  "description": "An AI-powered tool to generate custom promotional videos from a text prompt and a logo or mascot image. The AI creates a complete video with narration, soundtrack, and animated visuals.",
+  "requestFramePermissions": []
+}
