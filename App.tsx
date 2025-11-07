@@ -21,15 +21,25 @@ const App: React.FC = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
 
   useEffect(() => {
-    const checkApiKey = async () => {
-      if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-        const keySelected = await window.aistudio.hasSelectedApiKey();
-        setHasApiKey(keySelected);
-      } else {
-        // Fallback for environments where aistudio is not available
-        console.warn('window.aistudio not found. Assuming API key is set.');
-        setHasApiKey(true);
-      }
+    const checkApiKey = () => {
+      // The host environment can be slow to inject the aistudio object.
+      // We'll wait a moment before checking to avoid race conditions.
+      setTimeout(async () => {
+        if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+          try {
+            const keySelected = await window.aistudio.hasSelectedApiKey();
+            setHasApiKey(keySelected);
+          } catch (e) {
+            console.error("Error checking for API key:", e);
+            setHasApiKey(false); // Default to false on error
+          }
+        } else {
+          // If aistudio is not available, we can't check for a key.
+          // We must assume no key is selected and show the selector component.
+          console.warn('window.aistudio not found. Defaulting to show API key selector.');
+          setHasApiKey(false);
+        }
+      }, 200); // A small delay to account for script injection timing.
     };
     checkApiKey();
   }, []);
